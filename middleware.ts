@@ -8,6 +8,18 @@ export function middleware(request: NextRequest) {
   
   // Define public routes that don't need authentication
   const isPublicRoute = pathname.startsWith('/auth')
+  const isRootPath = pathname === '/'
+  
+  // Always allow access to the root path initially
+  // This helps with initial loading in production
+  if (isRootPath) {
+    // If not authenticated, redirect to auth page
+    if (!token) {
+      return NextResponse.redirect(new URL('/auth', request.url))
+    }
+    // If authenticated, allow access to root
+    return NextResponse.next()
+  }
   
   // If authenticated and trying to access auth page, redirect to home
   if (token && isPublicRoute) {
@@ -22,7 +34,9 @@ export function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
-// See "Matching Paths" below to learn more
+// Update matcher to exclude more static assets and API routes
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|images|.*\\.png$|.*\\.jpg$|.*\\.svg$).*)'
+  ],
 } 

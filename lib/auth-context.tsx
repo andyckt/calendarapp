@@ -8,12 +8,12 @@ import { useRouter } from 'next/navigation'
 // Helper function to set a cookie
 const setCookie = (name: string, value: string, days = 7) => {
   const expires = new Date(Date.now() + days * 864e5).toUTCString()
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`
 }
 
 // Helper function to delete a cookie
 const deleteCookie = (name: string) => {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`
 }
 
 type AuthContextType = {
@@ -35,19 +35,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    // Check if there's a saved token and try to load user
-    const savedToken = localStorage.getItem('token')
-    const savedUser = localStorage.getItem('user')
-    
-    if (savedToken && savedUser) {
-      setToken(savedToken)
-      setUser(JSON.parse(savedUser))
-      
-      // Also set the cookie in case it's missing
-      setCookie('token', savedToken)
+    // Safety check for server-side rendering
+    if (typeof window === 'undefined') {
+      setIsLoading(false)
+      return
     }
-    
-    setIsLoading(false)
+
+    try {
+      // Check if there's a saved token and try to load user
+      const savedToken = localStorage.getItem('token')
+      const savedUser = localStorage.getItem('user')
+      
+      if (savedToken && savedUser) {
+        setToken(savedToken)
+        try {
+          const parsedUser = JSON.parse(savedUser)
+          setUser(parsedUser)
+          
+          // Also set the cookie in case it's missing
+          setCookie('token', savedToken)
+        } catch (e) {
+          // If parsing fails, clear the stored data
+          localStorage.removeItem('user')
+          localStorage.removeItem('token')
+        }
+      }
+    } catch (e) {
+      console.error('Error accessing localStorage:', e)
+    } finally {
+      setIsLoading(false)
+    }
   }, [])
 
   const login = async (email: string, password: string) => {
@@ -63,6 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Also set cookie for server-side auth
       setCookie('token', response.token)
+      
+      // Navigate to home page after successful login
+      router.push('/')
     } catch (error) {
       console.error('Login error:', error)
       throw error
@@ -84,6 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Also set cookie for server-side auth
       setCookie('token', response.token)
+      
+      // Navigate to home page after successful registration
+      router.push('/')
     } catch (error) {
       console.error('Registration error:', error)
       throw error
@@ -98,13 +121,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null)
     
     // Remove from localStorage
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    try {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+    } catch (e) {
+      console.error('Error accessing localStorage during logout:', e)
+    }
     
     // Remove cookie
     deleteCookie('token')
     
-    // Redirect to auth page (now handled in the page component)
+    // Redirect to auth page
+    router.push('/auth')
   }
 
   return (
