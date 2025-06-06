@@ -13,8 +13,6 @@ import {
   MapPin,
   Users,
   Calendar as CalendarIcon,
-  Pause,
-  Sparkles,
   X,
   LogOut,
 } from "lucide-react"
@@ -46,9 +44,6 @@ export default function Home() {
   } = useCalendar()
 
   const [isLoaded, setIsLoaded] = useState(false)
-  const [showAIPopup, setShowAIPopup] = useState(false)
-  const [typedText, setTypedText] = useState("")
-  const [isPlaying, setIsPlaying] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false)
   const [isEditEventOpen, setIsEditEventOpen] = useState(false)
@@ -56,32 +51,7 @@ export default function Home() {
 
   useEffect(() => {
     setIsLoaded(true)
-
-    // Show AI popup after 3 seconds
-    const popupTimer = setTimeout(() => {
-      setShowAIPopup(true)
-    }, 3000)
-
-    return () => clearTimeout(popupTimer)
   }, [])
-
-  useEffect(() => {
-    if (showAIPopup) {
-      const text =
-        "Looks like you don't have that many meetings today. Shall I play some Hans Zimmer essentials to help you get into your Flow State?"
-      let i = 0
-      const typingInterval = setInterval(() => {
-        if (i < text.length) {
-          setTypedText((prev) => prev + text.charAt(i))
-          i++
-        } else {
-          clearInterval(typingInterval)
-        }
-      }, 50)
-
-      return () => clearInterval(typingInterval)
-    }
-  }, [showAIPopup])
 
   const handleEventClick = (event: Event) => {
     setSelectedEvent(event)
@@ -142,11 +112,6 @@ export default function Home() {
   const miniCalendarDays = Array.from({ length: daysInMonth + firstDayOfMonth }, (_, i) =>
     i < firstDayOfMonth ? null : i - firstDayOfMonth + 1,
   )
-
-  const togglePlay = () => {
-    setIsPlaying(!isPlaying)
-    // Here you would typically also control the actual audio playback
-  }
 
   const handleLogout = () => {
     logout()
@@ -411,53 +376,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-
-        {/* AI Popup */}
-        {showAIPopup && (
-          <div className="fixed bottom-8 right-8 z-20">
-            <div className="w-[450px] relative bg-gradient-to-br from-blue-400/30 via-blue-500/30 to-blue-600/30 backdrop-blur-lg p-6 rounded-2xl shadow-xl border border-blue-300/30 text-white">
-              <button
-                onClick={() => setShowAIPopup(false)}
-                className="absolute top-2 right-2 text-white/70 hover:text-white transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-              <div className="flex gap-3">
-                <div className="flex-shrink-0">
-                  <Sparkles className="h-5 w-5 text-blue-300" />
-                </div>
-                <div className="min-h-[80px]">
-                  <p className="text-base font-light">{typedText}</p>
-                </div>
-              </div>
-              <div className="mt-6 flex gap-3">
-                <button
-                  onClick={togglePlay}
-                  className="flex-1 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-sm transition-colors font-medium"
-                >
-                  Yes
-                </button>
-                <button
-                  onClick={() => setShowAIPopup(false)}
-                  className="flex-1 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-sm transition-colors font-medium"
-                >
-                  No
-                </button>
-              </div>
-              {isPlaying && (
-                <div className="mt-4 flex items-center justify-between">
-                  <button
-                    className="flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-white text-sm hover:bg-white/20 transition-colors"
-                    onClick={togglePlay}
-                  >
-                    <Pause className="h-4 w-4" />
-                    <span>Pause Hans Zimmer</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
 
         {selectedEvent && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
