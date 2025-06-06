@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { User } from './api-client'
 import apiClient from './api-client'
+import { useRouter } from 'next/navigation'
 
 // Helper function to set a cookie
 const setCookie = (name: string, value: string, days = 7) => {
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
     // Check if there's a saved token and try to load user
@@ -101,6 +103,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     // Remove cookie
     deleteCookie('token')
+    
+    // Redirect to auth page (now handled in the page component)
   }
 
   return (

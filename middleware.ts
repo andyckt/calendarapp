@@ -1,39 +1,28 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// Define which routes should be public (accessible without login)
-const publicRoutes = ['/auth']
-
+// This function can be marked `async` if using `await` inside
 export function middleware(request: NextRequest) {
+  const token = request.cookies.get('token')?.value
   const { pathname } = request.nextUrl
   
-  // Check if the pathname is a public route
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
+  // Define public routes that don't need authentication
+  const isPublicRoute = pathname.startsWith('/auth')
   
-  // If this is an API route, don't redirect
-  if (pathname.startsWith('/api')) {
-    return NextResponse.next()
-  }
-  
-  // Get the token from cookies or headers
-  const token = request.cookies.get('token')?.value || request.headers.get('Authorization')?.split(' ')[1]
-  
-  // If there's no token and it's not a public route, redirect to login
-  if (!token && !isPublicRoute) {
-    const url = new URL('/auth', request.url)
-    return NextResponse.redirect(url)
-  }
-  
-  // If there's a token and user is trying to access auth page, redirect to home
+  // If authenticated and trying to access auth page, redirect to home
   if (token && isPublicRoute) {
-    const url = new URL('/', request.url)
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+  
+  // If not authenticated and trying to access protected route, redirect to auth
+  if (!token && !isPublicRoute) {
+    return NextResponse.redirect(new URL('/auth', request.url))
   }
   
   return NextResponse.next()
 }
 
+// See "Matching Paths" below to learn more
 export const config = {
-  // Matcher for routes that should go through this middleware
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 } 
