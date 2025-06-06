@@ -1,14 +1,17 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import { AuthProvider } from "@/lib/auth-context"
+import { CalendarProvider } from "@/lib/calendar-context"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Lovy-tech | Smart Glasses OS",
-  description: "Advanced e-OS system for smart glasses with real-time performance tracking",
-    generator: 'v0.dev'
+  title: "Calendar App",
+  description: "Modern calendar application with real-time scheduling",
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -18,7 +21,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <AuthProvider>
+          <CalendarProvider>
+            {children}
+            <Toaster position="top-right" />
+          </CalendarProvider>
+        </AuthProvider>
+      </body>
     </html>
   )
 }

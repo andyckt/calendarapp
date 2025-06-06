@@ -12,17 +12,45 @@ import {
   Clock,
   MapPin,
   Users,
-  Calendar,
+  Calendar as CalendarIcon,
   Pause,
   Sparkles,
   X,
+  LogOut,
 } from "lucide-react"
+import { format, parseISO, startOfWeek, addDays, isToday } from "date-fns"
+import { useAuth } from "@/lib/auth-context"
+import { useCalendar } from "@/lib/calendar-context"
+import { Event } from "@/lib/api-client"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import EventForm from "@/components/calendar/event-form"
+import { toast } from "sonner"
 
 export default function Home() {
+  const { user, logout } = useAuth()
+  const { 
+    calendars,
+    events,
+    loading,
+    error,
+    currentDate,
+    viewType,
+    setViewType,
+    nextPeriod,
+    prevPeriod,
+    today: goToToday,
+    deleteEvent
+  } = useCalendar()
+
   const [isLoaded, setIsLoaded] = useState(false)
   const [showAIPopup, setShowAIPopup] = useState(false)
   const [typedText, setTypedText] = useState("")
   const [isPlaying, setIsPlaying] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const [isCreateEventOpen, setIsCreateEventOpen] = useState(false)
+  const [isEditEventOpen, setIsEditEventOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   useEffect(() => {
     setIsLoaded(true)
@@ -38,7 +66,7 @@ export default function Home() {
   useEffect(() => {
     if (showAIPopup) {
       const text =
-        "LLooks like you don't have that many meetings today. Shall I play some Hans Zimmer essentials to help you get into your Flow State?"
+        "Looks like you don't have that many meetings today. Shall I play some Hans Zimmer essentials to help you get into your Flow State?"
       let i = 0
       const typingInterval = setInterval(() => {
         if (i < text.length) {
@@ -53,231 +81,74 @@ export default function Home() {
     }
   }, [showAIPopup])
 
-  const [currentView, setCurrentView] = useState("week")
-  const [currentMonth, setCurrentMonth] = useState("March 2025")
-  const [currentDate, setCurrentDate] = useState("March 5")
-  const [selectedEvent, setSelectedEvent] = useState(null)
-
-  const handleEventClick = (event) => {
+  const handleEventClick = (event: Event) => {
     setSelectedEvent(event)
   }
 
-  // Updated sample calendar events with all events before 4 PM
-  const events = [
-    {
-      id: 1,
-      title: "Team Meeting",
-      startTime: "09:00",
-      endTime: "10:00",
-      color: "bg-blue-500",
-      day: 1,
-      description: "Weekly team sync-up",
-      location: "Conference Room A",
-      attendees: ["John Doe", "Jane Smith", "Bob Johnson"],
-      organizer: "Alice Brown",
-    },
-    {
-      id: 2,
-      title: "Lunch with Sarah",
-      startTime: "12:30",
-      endTime: "13:30",
-      color: "bg-green-500",
-      day: 1,
-      description: "Discuss project timeline",
-      location: "Cafe Nero",
-      attendees: ["Sarah Lee"],
-      organizer: "You",
-    },
-    {
-      id: 3,
-      title: "Project Review",
-      startTime: "14:00",
-      endTime: "15:30",
-      color: "bg-purple-500",
-      day: 3,
-      description: "Q2 project progress review",
-      location: "Meeting Room 3",
-      attendees: ["Team Alpha", "Stakeholders"],
-      organizer: "Project Manager",
-    },
-    {
-      id: 4,
-      title: "Client Call",
-      startTime: "10:00",
-      endTime: "11:00",
-      color: "bg-yellow-500",
-      day: 2,
-      description: "Quarterly review with major client",
-      location: "Zoom Meeting",
-      attendees: ["Client Team", "Sales Team"],
-      organizer: "Account Manager",
-    },
-    {
-      id: 5,
-      title: "Team Brainstorm",
-      startTime: "13:00",
-      endTime: "14:30",
-      color: "bg-indigo-500",
-      day: 4,
-      description: "Ideation session for new product features",
-      location: "Creative Space",
-      attendees: ["Product Team", "Design Team"],
-      organizer: "Product Owner",
-    },
-    {
-      id: 6,
-      title: "Product Demo",
-      startTime: "11:00",
-      endTime: "12:00",
-      color: "bg-pink-500",
-      day: 5,
-      description: "Showcase new features to stakeholders",
-      location: "Demo Room",
-      attendees: ["Stakeholders", "Dev Team"],
-      organizer: "Tech Lead",
-    },
-    {
-      id: 7,
-      title: "Marketing Meeting",
-      startTime: "13:00",
-      endTime: "14:00",
-      color: "bg-teal-500",
-      day: 6,
-      description: "Discuss Q3 marketing strategy",
-      location: "Marketing Office",
-      attendees: ["Marketing Team"],
-      organizer: "Marketing Director",
-    },
-    {
-      id: 8,
-      title: "Code Review",
-      startTime: "15:00",
-      endTime: "16:00",
-      color: "bg-cyan-500",
-      day: 7,
-      description: "Review pull requests for new feature",
-      location: "Dev Area",
-      attendees: ["Dev Team"],
-      organizer: "Senior Developer",
-    },
-    {
-      id: 9,
-      title: "Morning Standup",
-      startTime: "08:30",
-      endTime: "09:30", // Changed from "09:00" to "09:30"
-      color: "bg-blue-400",
-      day: 2,
-      description: "Daily team standup",
-      location: "Slack Huddle",
-      attendees: ["Development Team"],
-      organizer: "Scrum Master",
-    },
-    {
-      id: 10,
-      title: "Design Review",
-      startTime: "14:30",
-      endTime: "15:45",
-      color: "bg-purple-400",
-      day: 5,
-      description: "Review new UI designs",
-      location: "Design Lab",
-      attendees: ["UX Team", "Product Manager"],
-      organizer: "Lead Designer",
-    },
-    {
-      id: 11,
-      title: "Investor Meeting",
-      startTime: "10:30",
-      endTime: "12:00",
-      color: "bg-red-400",
-      day: 7,
-      description: "Quarterly investor update",
-      location: "Board Room",
-      attendees: ["Executive Team", "Investors"],
-      organizer: "CEO",
-    },
-    {
-      id: 12,
-      title: "Team Training",
-      startTime: "09:30",
-      endTime: "11:30",
-      color: "bg-green-400",
-      day: 4,
-      description: "New tool onboarding session",
-      location: "Training Room",
-      attendees: ["All Departments"],
-      organizer: "HR",
-    },
-    {
-      id: 13,
-      title: "Budget Review",
-      startTime: "13:30",
-      endTime: "15:00",
-      color: "bg-yellow-400",
-      day: 3,
-      description: "Quarterly budget analysis",
-      location: "Finance Office",
-      attendees: ["Finance Team", "Department Heads"],
-      organizer: "CFO",
-    },
-    {
-      id: 14,
-      title: "Client Presentation",
-      startTime: "11:00",
-      endTime: "12:30",
-      color: "bg-orange-400",
-      day: 6,
-      description: "Present new project proposal",
-      location: "Client Office",
-      attendees: ["Sales Team", "Client Representatives"],
-      organizer: "Account Executive",
-    },
-    {
-      id: 15,
-      title: "Product Planning",
-      startTime: "14:00",
-      endTime: "15:30",
-      color: "bg-pink-400",
-      day: 1,
-      description: "Roadmap discussion for Q3",
-      location: "Strategy Room",
-      attendees: ["Product Team", "Engineering Leads"],
-      organizer: "Product Manager",
-    },
-  ]
+  const handleCreateEvent = () => {
+    setIsCreateEventOpen(true)
+  }
+
+  const handleEditEvent = () => {
+    if (selectedEvent) {
+      setIsEditEventOpen(true)
+      setSelectedEvent(null)
+    }
+  }
+
+  const handleDeleteEvent = async () => {
+    if (selectedEvent) {
+      try {
+        await deleteEvent(selectedEvent.id)
+        toast.success("Event deleted successfully")
+        setSelectedEvent(null)
+        setConfirmDeleteOpen(false)
+      } catch (error) {
+        toast.error("Failed to delete event")
+      }
+    }
+  }
 
   // Sample calendar days for the week view
+  const weekStartDate = startOfWeek(currentDate, { weekStartsOn: 0 })
   const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
-  const weekDates = [3, 4, 5, 6, 7, 8, 9]
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStartDate, i))
   const timeSlots = Array.from({ length: 9 }, (_, i) => i + 8) // 8 AM to 4 PM
 
   // Helper function to calculate event position and height
-  const calculateEventStyle = (startTime, endTime) => {
-    const start = Number.parseInt(startTime.split(":")[0]) + Number.parseInt(startTime.split(":")[1]) / 60
-    const end = Number.parseInt(endTime.split(":")[0]) + Number.parseInt(endTime.split(":")[1]) / 60
-    const top = (start - 8) * 80 // 80px per hour
-    const height = (end - start) * 80
+  const calculateEventStyle = (startTime: string, endTime: string) => {
+    const start = new Date(startTime)
+    const end = new Date(endTime)
+    
+    const startHour = start.getHours() + start.getMinutes() / 60
+    const endHour = end.getHours() + end.getMinutes() / 60
+    
+    // Adjust for events outside our time range (8am-4pm)
+    const visibleStartHour = Math.max(startHour, 8)
+    const visibleEndHour = Math.min(endHour, 17)
+    
+    const top = (visibleStartHour - 8) * 80 // 80px per hour
+    const height = (visibleEndHour - visibleStartHour) * 80
+    
     return { top: `${top}px`, height: `${height}px` }
   }
 
   // Sample calendar for mini calendar
-  const daysInMonth = 31
-  const firstDayOffset = 5 // Friday is the first day of the month in this example
-  const miniCalendarDays = Array.from({ length: daysInMonth + firstDayOffset }, (_, i) =>
-    i < firstDayOffset ? null : i - firstDayOffset + 1,
+  const currentMonth = format(currentDate, "MMMM yyyy")
+  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
+  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay()
+  const miniCalendarDays = Array.from({ length: daysInMonth + firstDayOfMonth }, (_, i) =>
+    i < firstDayOfMonth ? null : i - firstDayOfMonth + 1,
   )
-
-  // Sample my calendars
-  const myCalendars = [
-    { name: "My Calendar", color: "bg-blue-500" },
-    { name: "Work", color: "bg-green-500" },
-    { name: "Personal", color: "bg-purple-500" },
-    { name: "Family", color: "bg-orange-500" },
-  ]
 
   const togglePlay = () => {
     setIsPlaying(!isPlaying)
     // Here you would typically also control the actual audio playback
+  }
+
+  const handleLogout = () => {
+    logout()
+    toast.success("Logged out successfully")
   }
 
   return (
@@ -311,8 +182,16 @@ export default function Home() {
             />
           </div>
           <Settings className="h-6 w-6 text-white drop-shadow-md" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleLogout}
+            className="text-white hover:bg-white/10"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
           <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold shadow-md">
-            U
+            {user?.name?.charAt(0) || 'U'}
           </div>
         </div>
       </header>
@@ -325,7 +204,10 @@ export default function Home() {
           style={{ animationDelay: "0.4s" }}
         >
           <div>
-            <button className="mb-6 flex items-center justify-center gap-2 rounded-full bg-blue-500 px-4 py-3 text-white w-full">
+            <button 
+              className="mb-6 flex items-center justify-center gap-2 rounded-full bg-blue-500 px-4 py-3 text-white w-full"
+              onClick={handleCreateEvent}
+            >
               <Plus className="h-5 w-5" />
               <span>Create</span>
             </button>
@@ -351,16 +233,21 @@ export default function Home() {
                   </div>
                 ))}
 
-                {miniCalendarDays.map((day, i) => (
-                  <div
-                    key={i}
-                    className={`text-xs rounded-full w-7 h-7 flex items-center justify-center ${
-                      day === 5 ? "bg-blue-500 text-white" : "text-white hover:bg-white/20"
-                    } ${!day ? "invisible" : ""}`}
-                  >
-                    {day}
-                  </div>
-                ))}
+                {miniCalendarDays.map((day, i) => {
+                  const date = day ? new Date(currentDate.getFullYear(), currentDate.getMonth(), day) : null
+                  const isCurrentDay = date ? isToday(date) : false
+                  
+                  return (
+                    <div
+                      key={i}
+                      className={`text-xs rounded-full w-7 h-7 flex items-center justify-center ${
+                        isCurrentDay ? "bg-blue-500 text-white" : "text-white hover:bg-white/20"
+                      } ${!day ? "invisible" : ""}`}
+                    >
+                      {day}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -368,8 +255,8 @@ export default function Home() {
             <div>
               <h3 className="text-white font-medium mb-3">My calendars</h3>
               <div className="space-y-2">
-                {myCalendars.map((cal, i) => (
-                  <div key={i} className="flex items-center gap-3">
+                {calendars.map((cal) => (
+                  <div key={cal.id} className="flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-sm ${cal.color}`}></div>
                     <span className="text-white text-sm">{cal.name}</span>
                   </div>
@@ -379,7 +266,10 @@ export default function Home() {
           </div>
 
           {/* New position for the big plus button */}
-          <button className="mt-6 flex items-center justify-center gap-2 rounded-full bg-blue-500 p-4 text-white w-14 h-14 self-start">
+          <button 
+            className="mt-6 flex items-center justify-center gap-2 rounded-full bg-blue-500 p-4 text-white w-14 h-14 self-start"
+            onClick={handleCreateEvent}
+          >
             <Plus className="h-6 w-6" />
           </button>
         </div>
@@ -392,34 +282,47 @@ export default function Home() {
           {/* Calendar Controls */}
           <div className="flex items-center justify-between p-4 border-b border-white/20">
             <div className="flex items-center gap-4">
-              <button className="px-4 py-2 text-white bg-blue-500 rounded-md">Today</button>
+              <button 
+                className="px-4 py-2 text-white bg-blue-500 rounded-md"
+                onClick={goToToday}
+              >
+                Today
+              </button>
               <div className="flex">
-                <button className="p-2 text-white hover:bg-white/10 rounded-l-md">
+                <button 
+                  className="p-2 text-white hover:bg-white/10 rounded-l-md"
+                  onClick={prevPeriod}
+                >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
-                <button className="p-2 text-white hover:bg-white/10 rounded-r-md">
+                <button 
+                  className="p-2 text-white hover:bg-white/10 rounded-r-md"
+                  onClick={nextPeriod}
+                >
                   <ChevronRight className="h-5 w-5" />
                 </button>
               </div>
-              <h2 className="text-xl font-semibold text-white">{currentDate}</h2>
+              <h2 className="text-xl font-semibold text-white">
+                {format(currentDate, "MMMM d")}
+              </h2>
             </div>
 
             <div className="flex items-center gap-2 rounded-md p-1">
               <button
-                onClick={() => setCurrentView("day")}
-                className={`px-3 py-1 rounded ${currentView === "day" ? "bg-white/20" : ""} text-white text-sm`}
+                onClick={() => setViewType("day")}
+                className={`px-3 py-1 rounded ${viewType === "day" ? "bg-white/20" : ""} text-white text-sm`}
               >
                 Day
               </button>
               <button
-                onClick={() => setCurrentView("week")}
-                className={`px-3 py-1 rounded ${currentView === "week" ? "bg-white/20" : ""} text-white text-sm`}
+                onClick={() => setViewType("week")}
+                className={`px-3 py-1 rounded ${viewType === "week" ? "bg-white/20" : ""} text-white text-sm`}
               >
                 Week
               </button>
               <button
-                onClick={() => setCurrentView("month")}
-                className={`px-3 py-1 rounded ${currentView === "month" ? "bg-white/20" : ""} text-white text-sm`}
+                onClick={() => setViewType("month")}
+                className={`px-3 py-1 rounded ${viewType === "month" ? "bg-white/20" : ""} text-white text-sm`}
               >
                 Month
               </button>
@@ -432,16 +335,21 @@ export default function Home() {
               {/* Week Header */}
               <div className="grid grid-cols-8 border-b border-white/20">
                 <div className="p-2 text-center text-white/50 text-xs"></div>
-                {weekDays.map((day, i) => (
-                  <div key={i} className="p-2 text-center border-l border-white/20">
-                    <div className="text-xs text-white/70 font-medium">{day}</div>
-                    <div
-                      className={`text-lg font-medium mt-1 text-white ${weekDates[i] === 5 ? "bg-blue-500 rounded-full w-8 h-8 flex items-center justify-center mx-auto" : ""}`}
-                    >
-                      {weekDates[i]}
+                {weekDays.map((day, i) => {
+                  const date = weekDates[i]
+                  const isCurrentDay = isToday(date)
+                  
+                  return (
+                    <div key={i} className="p-2 text-center border-l border-white/20">
+                      <div className="text-xs text-white/70 font-medium">{day}</div>
+                      <div
+                        className={`text-lg font-medium mt-1 text-white ${isCurrentDay ? "bg-blue-500 rounded-full w-8 h-8 flex items-center justify-center mx-auto" : ""}`}
+                      >
+                        {format(date, "d")}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* Time Grid */}
@@ -456,35 +364,46 @@ export default function Home() {
                 </div>
 
                 {/* Days Columns */}
-                {Array.from({ length: 7 }).map((_, dayIndex) => (
-                  <div key={dayIndex} className="border-l border-white/20 relative">
-                    {timeSlots.map((_, timeIndex) => (
-                      <div key={timeIndex} className="h-20 border-b border-white/10"></div>
-                    ))}
+                {Array.from({ length: 7 }).map((_, dayIndex) => {
+                  const currentDayDate = weekDates[dayIndex]
+                  
+                  return (
+                    <div key={dayIndex} className="border-l border-white/20 relative">
+                      {timeSlots.map((_, timeIndex) => (
+                        <div key={timeIndex} className="h-20 border-b border-white/10"></div>
+                      ))}
 
-                    {/* Events */}
-                    {events
-                      .filter((event) => event.day === dayIndex + 1)
-                      .map((event, i) => {
-                        const eventStyle = calculateEventStyle(event.startTime, event.endTime)
-                        return (
-                          <div
-                            key={i}
-                            className={`absolute ${event.color} rounded-md p-2 text-white text-xs shadow-md cursor-pointer transition-all duration-200 ease-in-out hover:translate-y-[-2px] hover:shadow-lg`}
-                            style={{
-                              ...eventStyle,
-                              left: "4px",
-                              right: "4px",
-                            }}
-                            onClick={() => handleEventClick(event)}
-                          >
-                            <div className="font-medium">{event.title}</div>
-                            <div className="opacity-80 text-[10px] mt-1">{`${event.startTime} - ${event.endTime}`}</div>
-                          </div>
-                        )
-                      })}
-                  </div>
-                ))}
+                      {/* Events */}
+                      {events
+                        .filter(event => {
+                          const eventDate = new Date(event.startTime)
+                          return eventDate.getDate() === currentDayDate.getDate() &&
+                                eventDate.getMonth() === currentDayDate.getMonth() &&
+                                eventDate.getFullYear() === currentDayDate.getFullYear()
+                        })
+                        .map((event, i) => {
+                          const eventStyle = calculateEventStyle(event.startTime, event.endTime)
+                          return (
+                            <div
+                              key={i}
+                              className={`absolute ${event.color || 'bg-blue-500'} rounded-md p-2 text-white text-xs shadow-md cursor-pointer transition-all duration-200 ease-in-out hover:translate-y-[-2px] hover:shadow-lg`}
+                              style={{
+                                ...eventStyle,
+                                left: "4px",
+                                right: "4px",
+                              }}
+                              onClick={() => handleEventClick(event)}
+                            >
+                              <div className="font-medium">{event.title}</div>
+                              <div className="opacity-80 text-[10px] mt-1">
+                                {`${format(new Date(event.startTime), "h:mm a")} - ${format(new Date(event.endTime), "h:mm a")}`}
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -539,49 +458,102 @@ export default function Home() {
 
         {selectedEvent && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className={`${selectedEvent.color} p-6 rounded-lg shadow-xl max-w-md w-full mx-4`}>
+            <div className={`${selectedEvent.color || 'bg-blue-500'} p-6 rounded-lg shadow-xl max-w-md w-full mx-4`}>
               <h3 className="text-2xl font-bold mb-4 text-white">{selectedEvent.title}</h3>
               <div className="space-y-3 text-white">
                 <p className="flex items-center">
                   <Clock className="mr-2 h-5 w-5" />
-                  {`${selectedEvent.startTime} - ${selectedEvent.endTime}`}
+                  {`${format(new Date(selectedEvent.startTime), "h:mm a")} - ${format(new Date(selectedEvent.endTime), "h:mm a")}`}
                 </p>
+                {selectedEvent.location && (
+                  <p className="flex items-center">
+                    <MapPin className="mr-2 h-5 w-5" />
+                    {selectedEvent.location}
+                  </p>
+                )}
                 <p className="flex items-center">
-                  <MapPin className="mr-2 h-5 w-5" />
-                  {selectedEvent.location}
+                  <CalendarIcon className="mr-2 h-5 w-5" />
+                  {format(new Date(selectedEvent.startTime), "EEEE, MMMM d, yyyy")}
                 </p>
-                <p className="flex items-center">
-                  <Calendar className="mr-2 h-5 w-5" />
-                  {`${weekDays[selectedEvent.day - 1]}, ${weekDates[selectedEvent.day - 1]} ${currentMonth}`}
-                </p>
-                <p className="flex items-start">
-                  <Users className="mr-2 h-5 w-5 mt-1" />
-                  <span>
-                    <strong>Attendees:</strong>
-                    <br />
-                    {selectedEvent.attendees.join(", ") || "No attendees"}
-                  </span>
-                </p>
-                <p>
-                  <strong>Organizer:</strong> {selectedEvent.organizer}
-                </p>
-                <p>
-                  <strong>Description:</strong> {selectedEvent.description}
-                </p>
+                {selectedEvent.attendees?.length > 0 && (
+                  <p className="flex items-start">
+                    <Users className="mr-2 h-5 w-5 mt-1" />
+                    <span>
+                      <strong>Attendees:</strong>
+                      <br />
+                      {selectedEvent.attendees.map(a => a.name).join(", ")}
+                    </span>
+                  </p>
+                )}
+                {selectedEvent.description && (
+                  <p>
+                    <strong>Description:</strong> {selectedEvent.description}
+                  </p>
+                )}
               </div>
-              <div className="mt-6 flex justify-end">
-                <button
-                  className="bg-white text-gray-800 px-4 py-2 rounded hover:bg-gray-100 transition-colors"
+              <div className="mt-6 flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  className="bg-red-500/20 hover:bg-red-500/30 text-white border-red-500/30"
+                >
+                  Delete
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleEditEvent}
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/30"
+                >
+                  Edit
+                </Button>
+                <Button
                   onClick={() => setSelectedEvent(null)}
+                  className="bg-white text-gray-800 hover:bg-gray-100"
                 >
                   Close
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Floating Action Button - Removed */}
+        {/* Create Event Dialog */}
+        <Dialog open={isCreateEventOpen} onOpenChange={setIsCreateEventOpen}>
+          <DialogContent className="max-w-md bg-transparent border-0 p-0">
+            <EventForm onClose={() => setIsCreateEventOpen(false)} defaultDate={currentDate} />
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Event Dialog */}
+        <Dialog open={isEditEventOpen} onOpenChange={setIsEditEventOpen}>
+          <DialogContent className="max-w-md bg-transparent border-0 p-0">
+            {selectedEvent && (
+              <EventForm 
+                event={selectedEvent} 
+                onClose={() => {
+                  setIsEditEventOpen(false)
+                  setSelectedEvent(null)
+                }} 
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Confirm Delete Dialog */}
+        <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+          <DialogContent className="max-w-md">
+            <h2 className="text-xl font-bold mb-4">Delete Event</h2>
+            <p className="mb-6">Are you sure you want to delete this event? This action cannot be undone.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteEvent}>
+                Delete
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )
