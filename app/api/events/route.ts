@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
       const filters: any = {
         OR: [
           { userId }, // Events owned by the user
-          { attendees: { some: { id: userId } } }, // Events where user is an attendee
+          { eventAttendees: { some: { userId } } }, // Events where user is an attendee
         ],
       }
       
@@ -52,12 +52,16 @@ export async function GET(req: NextRequest) {
       const events = await prisma.event.findMany({
         where: filters,
         include: {
-          attendees: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
+          eventAttendees: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                }
+              }
+            }
           },
           calendar: true,
         },
@@ -66,7 +70,16 @@ export async function GET(req: NextRequest) {
         },
       })
       
-      return NextResponse.json(events)
+      // Transform the result to maintain backward compatibility
+      const transformedEvents = events.map(event => {
+        const { eventAttendees, ...rest } = event;
+        return {
+          ...rest,
+          attendees: eventAttendees.map(ea => ea.user)
+        };
+      });
+      
+      return NextResponse.json(transformedEvents)
     } catch (error) {
       console.error('Get events error:', error)
       return NextResponse.json(
@@ -131,23 +144,59 @@ export async function POST(req: NextRequest) {
           color: color || calendar.color,
           calendarId,
           userId,
-          attendees: {
-            connect: attendeeIds.map(id => ({ id })),
-          },
         },
         include: {
-          attendees: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
           calendar: true,
         },
       })
       
-      return NextResponse.json(event, { status: 201 })
+      // Create event attendees separately
+      if (attendeeIds.length > 0) {
+        await Promise.all(
+          attendeeIds.map(attendeeId => 
+            prisma.eventAttendee.create({
+              data: {
+                userId: attendeeId,
+                eventId: event.id
+              }
+            })
+          )
+        );
+        
+        // Fetch the event with attendees for the response
+        const eventWithAttendees = await prisma.event.findUnique({
+          where: { id: event.id },
+          include: {
+            eventAttendees: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  }
+                }
+              }
+            },
+            calendar: true,
+          }
+        });
+        
+        // Transform to maintain backwards compatibility
+        const { eventAttendees, ...rest } = eventWithAttendees!;
+        const transformedEvent = {
+          ...rest,
+          attendees: eventAttendees.map(ea => ea.user)
+        };
+        
+        return NextResponse.json(transformedEvent, { status: 201 });
+      }
+      
+      // If no attendees, return the event as is with an empty attendees array
+      return NextResponse.json({
+        ...event,
+        attendees: []
+      }, { status: 201 });
     } catch (error) {
       console.error('Create event error:', error)
       return NextResponse.json(

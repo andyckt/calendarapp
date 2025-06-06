@@ -29,12 +29,16 @@ export async function GET(
         id,
       },
       include: {
-        attendees: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+        eventAttendees: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            }
+          }
         },
         calendar: true,
       },
@@ -47,9 +51,12 @@ export async function GET(
       )
     }
 
+    // Transform to maintain backwards compatibility
+    const attendees = event.eventAttendees.map(ea => ea.user);
+
     // Check if the user has permission to view this event
     const hasPermission = event.userId === userId || 
-                        event.attendees.some((attendee: { id: string }) => attendee.id === userId)
+                        attendees.some((attendee) => attendee.id === userId)
     
     if (!hasPermission) {
       return NextResponse.json(
@@ -58,7 +65,12 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(event)
+    // Transform the response to maintain backwards compatibility
+    const { eventAttendees, ...rest } = event;
+    return NextResponse.json({
+      ...rest,
+      attendees
+    })
   })
 }
 
@@ -90,7 +102,11 @@ export async function PATCH(
           id,
         },
         include: {
-          attendees: true,
+          eventAttendees: {
+            include: {
+              user: true
+            }
+          },
         },
       })
       
@@ -138,43 +154,104 @@ export async function PATCH(
         updateData.endTime = new Date(updateData.endTime)
       }
       
-      // Handle attendees updates
+      // Remove attendeeIds from updateData
       const { attendeeIds } = data
       if (attendeeIds) {
         delete updateData.attendeeIds
-        
-        // Get current attendees
-        const currentAttendeeIds = existingEvent.attendees.map((a: { id: string }) => a.id)
-        
-        // Determine attendees to connect and disconnect
-        const attendeesToConnect = attendeeIds.filter((id: string) => !currentAttendeeIds.includes(id))
-        const attendeesToDisconnect = currentAttendeeIds.filter((id: string) => !attendeeIds.includes(id))
-        
-        updateData.attendees = {
-          connect: attendeesToConnect.map(id => ({ id })),
-          disconnect: attendeesToDisconnect.map(id => ({ id })),
-        }
       }
       
-      // Update the event
+      // Update the event basic info first
       const updatedEvent = await prisma.event.update({
         where: {
           id,
         },
         data: updateData,
         include: {
-          attendees: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
+          eventAttendees: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                }
+              }
+            }
           },
           calendar: true,
         },
       })
       
-      return NextResponse.json(updatedEvent)
+      // Handle attendees updates separately if needed
+      if (attendeeIds) {
+        // Get current attendee IDs
+        const currentAttendeeIds = existingEvent.eventAttendees.map(ea => ea.userId);
+        
+        // Determine attendees to add and remove
+        const attendeesToAdd = attendeeIds.filter(id => !currentAttendeeIds.includes(id));
+        const attendeesToRemove = currentAttendeeIds.filter(id => !attendeeIds.includes(id));
+        
+        // Add new attendees
+        if (attendeesToAdd.length > 0) {
+          await Promise.all(
+            attendeesToAdd.map(attendeeId => 
+              prisma.eventAttendee.create({
+                data: {
+                  userId: attendeeId,
+                  eventId: id
+                }
+              })
+            )
+          );
+        }
+        
+        // Remove attendees
+        if (attendeesToRemove.length > 0) {
+          await Promise.all(
+            attendeesToRemove.map(attendeeId => 
+              prisma.eventAttendee.deleteMany({
+                where: {
+                  eventId: id,
+                  userId: attendeeId
+                }
+              })
+            )
+          );
+        }
+        
+        // Fetch the updated event with attendees
+        const refreshedEvent = await prisma.event.findUnique({
+          where: { id },
+          include: {
+            eventAttendees: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  }
+                }
+              }
+            },
+            calendar: true,
+          }
+        });
+        
+        // Transform to maintain backwards compatibility
+        const { eventAttendees, ...rest } = refreshedEvent!;
+        return NextResponse.json({
+          ...rest,
+          attendees: eventAttendees.map(ea => ea.user)
+        });
+      }
+      
+      // Transform the response to maintain backwards compatibility
+      const { eventAttendees, ...rest } = updatedEvent;
+      return NextResponse.json({
+        ...rest,
+        attendees: eventAttendees.map(ea => ea.user)
+      });
     } catch (error) {
       console.error('Update event error:', error)
       return NextResponse.json(
@@ -216,7 +293,7 @@ export async function DELETE(
         )
       }
       
-      // Delete the event
+      // Delete the event (will cascade delete related eventAttendees)
       await prisma.event.delete({
         where: {
           id,

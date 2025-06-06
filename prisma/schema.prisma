@@ -10,31 +10,31 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id             String     @id @default(uuid())
-  email          String     @unique
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  email          String          @unique
   name           String?
   password       String
-  createdAt      DateTime   @default(now()) @map("created_at")
-  updatedAt      DateTime   @updatedAt @map("updated_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
   calendars      Calendar[]
-  events         Event[]    @relation("EventOwner")
-  eventsAttending Event[]   @relation("EventAttendees")
+  events         Event[]         @relation("EventOwner")
+  eventAttendees EventAttendee[] @relation("UserToEventAttendee")
 
   @@map("users")
 }
 
 model Calendar {
-  id          String    @id @default(uuid())
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   color       String    @default("bg-blue-500")
   description String?
   isDefault   Boolean   @default(false) @map("is_default")
-  userId      String    @map("user_id")
+  userId      String    @map("user_id") @db.ObjectId
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   events      Event[]
@@ -44,22 +44,36 @@ model Calendar {
 }
 
 model Event {
-  id          String    @id @default(uuid())
-  title       String
-  description String?
-  location    String?
-  startTime   DateTime  @map("start_time")
-  endTime     DateTime  @map("end_time")
-  allDay      Boolean   @default(false) @map("all_day")
-  color       String?
-  calendarId  String    @map("calendar_id")
-  userId      String    @map("user_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id             String          @id @default(auto()) @map("_id") @db.ObjectId
+  title          String
+  description    String?
+  location       String?
+  startTime      DateTime        @map("start_time")
+  endTime        DateTime        @map("end_time")
+  allDay         Boolean         @default(false) @map("all_day")
+  color          String?
+  calendarId     String          @map("calendar_id") @db.ObjectId
+  userId         String          @map("user_id") @db.ObjectId
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
   
-  calendar    Calendar  @relation(fields: [calendarId], references: [id], onDelete: Cascade)
-  owner       User      @relation("EventOwner", fields: [userId], references: [id], onDelete: Cascade)
-  attendees   User[]    @relation("EventAttendees")
+  calendar       Calendar        @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  owner          User            @relation("EventOwner", fields: [userId], references: [id], onDelete: Cascade)
+  eventAttendees EventAttendee[] @relation("EventToEventAttendee")
 
   @@map("events")
+}
+
+// Explicit model for many-to-many relationship between User and Event for attendees
+model EventAttendee {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @map("user_id") @db.ObjectId
+  eventId   String   @map("event_id") @db.ObjectId
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  user      User     @relation("UserToEventAttendee", fields: [userId], references: [id], onDelete: Cascade)
+  event     Event    @relation("EventToEventAttendee", fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("event_attendees")
 }
