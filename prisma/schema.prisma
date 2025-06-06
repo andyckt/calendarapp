@@ -1,0 +1,65 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id             String     @id @default(uuid())
+  email          String     @unique
+  name           String?
+  password       String
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  calendars      Calendar[]
+  events         Event[]    @relation("EventOwner")
+  eventsAttending Event[]   @relation("EventAttendees")
+
+  @@map("users")
+}
+
+model Calendar {
+  id          String    @id @default(uuid())
+  name        String
+  color       String    @default("bg-blue-500")
+  description String?
+  isDefault   Boolean   @default(false) @map("is_default")
+  userId      String    @map("user_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  events      Event[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("calendars")
+}
+
+model Event {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  location    String?
+  startTime   DateTime  @map("start_time")
+  endTime     DateTime  @map("end_time")
+  allDay      Boolean   @default(false) @map("all_day")
+  color       String?
+  calendarId  String    @map("calendar_id")
+  userId      String    @map("user_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  
+  calendar    Calendar  @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  owner       User      @relation("EventOwner", fields: [userId], references: [id], onDelete: Cascade)
+  attendees   User[]    @relation("EventAttendees")
+
+  @@map("events")
+}
