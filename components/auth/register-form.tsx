@@ -43,12 +43,19 @@ export default function RegisterForm() {
   const onSubmit = async (data: RegisterFormValues) => {
     setIsLoading(true)
     try {
+      console.log("Attempting to register with:", { name: data.name, email: data.email })
       await register(data.name, data.email, data.password)
       toast.success("Registration successful")
       router.push("/")
     } catch (error) {
-      console.error("Registration error:", error)
-      toast.error("Registration failed. This email may already be in use.")
+      console.error("Registration error details:", error)
+      if (error instanceof Error) {
+        console.error("Error message:", error.message)
+        toast.error(`Registration failed: ${error.message}`)
+      } else {
+        console.error("Unknown error type:", typeof error)
+        toast.error("Registration failed. This email may already be in use.")
+      }
     } finally {
       setIsLoading(false)
     }

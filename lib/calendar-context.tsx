@@ -1,3 +1,5 @@
+"use client"
+
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { useAuth } from './auth-context'
 import apiClient, { Calendar, Event } from './api-client'

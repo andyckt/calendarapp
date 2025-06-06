@@ -34,12 +34,19 @@ export default function LoginForm() {
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true)
     try {
+      console.log("Attempting to login with:", { email: data.email })
       await login(data.email, data.password)
       toast.success("Login successful")
       router.push("/")
     } catch (error) {
-      console.error("Login error:", error)
-      toast.error("Login failed. Please check your credentials and try again.")
+      console.error("Login error details:", error)
+      if (error instanceof Error) {
+        console.error("Error message:", error.message)
+        toast.error(`Login failed: ${error.message}`)
+      } else {
+        console.error("Unknown error type:", typeof error)
+        toast.error("Login failed. Please check your credentials and try again.")
+      }
     } finally {
       setIsLoading(false)
     }
