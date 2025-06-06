@@ -37,7 +37,13 @@ export default function LoginForm() {
       console.log("Attempting to login with:", { email: data.email })
       await login(data.email, data.password)
       toast.success("Login successful")
-      router.push("/")
+      
+      // Add a small delay to ensure the cookie is set
+      console.log("Redirecting to homepage in 500ms...")
+      setTimeout(() => {
+        console.log("Redirecting now...")
+        window.location.href = "/" // Use direct navigation instead of router
+      }, 500)
     } catch (error) {
       console.error("Login error details:", error)
       if (error instanceof Error) {

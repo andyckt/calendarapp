@@ -4,6 +4,17 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 import { User } from './api-client'
 import apiClient from './api-client'
 
+// Helper function to set a cookie
+const setCookie = (name: string, value: string, days = 7) => {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString()
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`
+}
+
+// Helper function to delete a cookie
+const deleteCookie = (name: string) => {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+}
+
 type AuthContextType = {
   user: User | null
   token: string | null
@@ -29,6 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (savedToken && savedUser) {
       setToken(savedToken)
       setUser(JSON.parse(savedUser))
+      
+      // Also set the cookie in case it's missing
+      setCookie('token', savedToken)
     }
     
     setIsLoading(false)
@@ -44,6 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Save to localStorage
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
+      
+      // Also set cookie for server-side auth
+      setCookie('token', response.token)
     } catch (error) {
       console.error('Login error:', error)
       throw error
@@ -62,6 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Save to localStorage
       localStorage.setItem('token', response.token)
       localStorage.setItem('user', JSON.stringify(response.user))
+      
+      // Also set cookie for server-side auth
+      setCookie('token', response.token)
     } catch (error) {
       console.error('Registration error:', error)
       throw error
@@ -78,6 +98,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Remove from localStorage
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    
+    // Remove cookie
+    deleteCookie('token')
   }
 
   return (

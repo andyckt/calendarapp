@@ -46,7 +46,13 @@ export default function RegisterForm() {
       console.log("Attempting to register with:", { name: data.name, email: data.email })
       await register(data.name, data.email, data.password)
       toast.success("Registration successful")
-      router.push("/")
+      
+      // Add a small delay to ensure the cookie is set
+      console.log("Redirecting to homepage in 500ms...")
+      setTimeout(() => {
+        console.log("Redirecting now...")
+        window.location.href = "/" // Use direct navigation instead of router
+      }, 500)
     } catch (error) {
       console.error("Registration error details:", error)
       if (error instanceof Error) {
