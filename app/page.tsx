@@ -26,8 +26,10 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import EventForm from "@/components/calendar/event-form"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
+  const router = useRouter()
   const { user, logout } = useAuth()
   const { 
     calendars,
@@ -149,6 +151,7 @@ export default function Home() {
   const handleLogout = () => {
     logout()
     toast.success("Logged out successfully")
+    router.push('/auth')
   }
 
   return (
